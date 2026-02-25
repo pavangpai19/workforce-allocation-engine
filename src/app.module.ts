@@ -7,6 +7,7 @@ import { SkillsModule } from './skills/skills.module';
 import { AllocationsModule } from './allocations/allocations.module';
 import { PerformanceService } from './performance/performance.service';
 import { PerformanceController } from './performance/performance.controller';
+import { DecisionEngineService } from './intelligence/intelligence/decision-engine.service';
 import { DecisionEngineService } from './intelligence/decision-engine/decision-engine.service';
 
 @Module({

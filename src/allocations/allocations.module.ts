@@ -18,11 +18,22 @@ import { DeliveryProbabilityService } from './delivery-probability/delivery-prob
 import { DeliveryProbabilityController } from './delivery-probability/delivery-probability.controller';
 import { HiringSignalService } from './hiring-signal/hiring-signal.service';
 import { HiringSignalController } from './hiring-signal/hiring-signal.controller';
-import { DecisionEngineService } from '../../intelligence/decision-engine.service';
-
+import { DecisionEngineService } from '../intelligence/decision-engine.service';
 @Module({
   imports: [SupabaseModule],
   controllers: [AllocationsController, AllocationIntelligenceController, AllocationFairnessController, AutoAllocationController, AllocationRiskController, AllocationOutcomeController, AllocationForecastController, DeliveryProbabilityController, HiringSignalController],
-  providers: [AllocationsService, AllocationIntelligenceService, AllocationFairnessService, AutoAllocationService, AllocationRiskService, AllocationOutcomeService, AllocationForecastService, DeliveryProbabilityService, HiringSignalService],
+ providers: [
+  AllocationsService,
+  AllocationIntelligenceService,
+  AllocationFairnessService,
+  AutoAllocationService,
+  AllocationRiskService,
+  AllocationOutcomeService,
+  AllocationForecastService,
+  DeliveryProbabilityService,
+  HiringSignalService,
+  DecisionEngineService,
+],
+
 })
 export class AllocationsModule {}

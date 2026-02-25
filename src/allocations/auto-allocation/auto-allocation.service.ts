@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
-import { DecisionEngineService } from '../../intelligence/decision-engine.service';
+import { DecisionEngineService } from '../intelligence/decision-engine.service';
 
 @Injectable()
 export class AutoAllocationService {
