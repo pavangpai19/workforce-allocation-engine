@@ -14,4 +14,10 @@ export class EmployeesController {
   async create(@Body() body: any) {
     return this.employeesService.create(body);
   }
+
+  // NEW endpoint
+  @Get('workload')
+  async getWorkload() {
+    return this.employeesService.getWeeklyWorkload();
+  }
 }
