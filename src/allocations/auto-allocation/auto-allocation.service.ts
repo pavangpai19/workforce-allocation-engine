@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../supabase/supabase.service';
+import { DecisionEngineService } from '../../intelligence/decision-engine.service';
 
 @Injectable()
 export class AutoAllocationService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly decisionEngine: DecisionEngineService,
+  ) {}
 
   async autoAllocate(
     project_id: string,
@@ -13,7 +17,7 @@ export class AutoAllocationService {
   ) {
     const supabase = this.supabaseService.getClient();
 
-    // 1️⃣ get skill
+    // 1️⃣ Get skill
     const { data: skill } = await supabase
       .from('skills')
       .select('*')
@@ -22,7 +26,7 @@ export class AutoAllocationService {
 
     if (!skill) throw new Error('Skill not found');
 
-    // 2️⃣ get employees with skill
+    // 2️⃣ Employees with skill
     const { data: employeeSkills } = await supabase
       .from('employee_skills')
       .select('*')
@@ -30,57 +34,78 @@ export class AutoAllocationService {
 
     const employeeIds = employeeSkills.map((e: any) => e.employee_id);
 
-    if (employeeIds.length === 0)
+    if (!employeeIds.length)
       throw new Error('No employees with this skill');
 
-    // 3️⃣ employees data
+    // 3️⃣ Employee details
     const { data: employees } = await supabase
       .from('employees')
       .select('*')
       .in('id', employeeIds);
 
-    // 4️⃣ allocations for week
+    // 4️⃣ Weekly allocations
     const { data: allocations } = await supabase
       .from('allocations')
       .select('*')
       .eq('week_start_date', week_start_date);
 
-    const allocationMap: any = {};
-    allocations.forEach((a: any) => {
+    const allocationMap: Record<string, number> = {};
+    allocations?.forEach((a: any) => {
       allocationMap[a.employee_id] =
         (allocationMap[a.employee_id] || 0) + a.allocated_hours;
     });
 
-    // 5️⃣ compute fairness + capacity
+    // 5️⃣ Performance records
+    const { data: perfData } = await supabase
+      .from('employee_performance')
+      .select('*');
+
+    const performanceMap: Record<string, any[]> = {};
+    perfData?.forEach((p: any) => {
+      if (!performanceMap[p.employee_id]) {
+        performanceMap[p.employee_id] = [];
+      }
+      performanceMap[p.employee_id].push(p);
+    });
+
+    // 6️⃣ Rank employees
     const ranked = employees
       .map((emp: any) => {
         const allocated = allocationMap[emp.id] || 0;
         const capacity = emp.weekly_capacity_hours;
         const remaining = capacity - allocated;
 
-        const utilization = allocated / capacity;
+        const perfRecords = performanceMap[emp.id] || [];
 
-        let fairness_score = remaining / capacity;
-        if (utilization > 1) fairness_score -= 1;
-        if (utilization > 0.8) fairness_score -= 0.3;
-        if (utilization < 0.3) fairness_score += 0.4;
+        const fairness = this.decisionEngine.computeFairness(
+          allocated,
+          capacity,
+        );
+
+        const performance =
+          this.decisionEngine.computePerformance(perfRecords);
+
+        const final_score =
+          this.decisionEngine.computeFinalScore(fairness, performance);
 
         return {
           employee_id: emp.id,
           employee_name: emp.name,
           remaining,
-          fairness_score,
+          fairness,
+          performance,
+          final_score,
         };
       })
       .filter((e) => e.remaining >= required_hours)
-      .sort((a, b) => b.fairness_score - a.fairness_score);
+      .sort((a, b) => b.final_score - a.final_score);
 
-    if (ranked.length === 0)
+    if (!ranked.length)
       throw new Error('No employee available with enough capacity');
 
     const selected = ranked[0];
 
-    // 6️⃣ create allocation
+    // 7️⃣ Create allocation
     const { data: newAllocation, error } = await supabase
       .from('allocations')
       .insert([
@@ -89,6 +114,7 @@ export class AutoAllocationService {
           project_id,
           allocated_hours: required_hours,
           week_start_date,
+          status: 'PROPOSED',
         },
       ])
       .select();
@@ -98,6 +124,11 @@ export class AutoAllocationService {
     return {
       message: 'Auto allocation successful',
       allocated_to: selected.employee_name,
+      decision_breakdown: {
+        fairness: selected.fairness,
+        performance: selected.performance,
+        final_score: selected.final_score,
+      },
       allocation: newAllocation,
     };
   }
