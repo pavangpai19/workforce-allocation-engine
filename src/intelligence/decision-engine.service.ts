@@ -6,7 +6,7 @@ export class DecisionEngineService {
   computeFairness(allocated: number, capacity: number) {
     const utilization = capacity ? allocated / capacity : 0;
 
-    let fairness = (capacity - allocated) / capacity;
+    let fairness = capacity ? (capacity - allocated) / capacity : 0;
 
     if (utilization > 1) fairness -= 1;
     if (utilization > 0.8) fairness -= 0.3;
